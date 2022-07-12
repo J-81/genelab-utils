@@ -17,6 +17,8 @@ import pandas as pd
 import subprocess
 from subprocess import Popen, PIPE
 
+from lib import split_input_fastq_file
+
 parser = argparse.ArgumentParser(description = "This is a helper program for a specific demultiplexing step for the \
                                               GeneLab Raw Data Generation for Bulk RNAseq Prepared with theh Qiagen UPX Kit protocol \
                                               https://github.com/asaravia-butler/GeneLab_Data_Processing/blob/amanda-branch/Raw_Data_Generation/UPX_kit_for_bulk_RNAseq.md",
@@ -130,66 +132,6 @@ def check_if_outputs_already_exist(IDs_list, output_dir, prefix, suffix):
             wprint("We don't want to overwrite things, remove them first if wanting to write new files there.")
             print("\nExiting for now.\n")
             sys.exit(1)
-
-
-def split_input_fastq_file(IDs_list, counts_dict, input_fastq, output_dir, prefix, suffix):
-
-    # opening all potential output files (to avoid overhead of opening and closing on each entry)
-    # dictionary to link cell IDs to their specific file handle
-    files_dict = {}
-
-    i = 0
-    for cell_ID in IDs_list:
-
-        i += 1
-
-        curr_handle = "handle_" + str(i)
-
-        files_dict[cell_ID] = curr_handle
-
-        curr_file_path = str(output_dir) + str(prefix) + str(cell_ID) + str(suffix)
-
-        files_dict[cell_ID] = open(curr_file_path, "w")
-
-
-    unmatched_out = open(str(output_dir) + str(prefix) + "unmatched" + str(suffix), "w")
-
-    # opening and running through our pooled input fastq
-    with gzip.open(input_fastq, "rt") as fastq_in:
-
-        # iterating fastq entries with biopython
-        for header, seq, qual in FastqGeneralIterator(fastq_in):
-
-            # looping through our cell IDs list so long as this entry hasn't been matched yet
-            for cell_ID in IDs_list:
-
-                # checking if ID is in header
-                if "_" + str(cell_ID) + "_" in header:
-
-                    files_dict[cell_ID].write("@%s\n%s\n+\n%s\n" % (header, seq, qual))
-
-                    # adding a count for that cell ID to the counts dictionary
-                    counts_dict[cell_ID] += 1
-
-                    # stopping search for this entry
-                    break
-
-            else:
-
-                # if not found, writing to unmatched output and counting
-                unmatched_out.write("@%s\n%s\n+\n%s\n" % (header, seq, qual))
-
-                counts_dict["unmatched"] += 1
-
-    # closing all files
-    for cell_ID in IDs_list:
-
-        files_dict[cell_ID].close()
-
-    unmatched_out.close()
-
-    return(counts_dict)
-
 
 def write_out_counts_dict(counts_dict, output_dir, prefix):
 
